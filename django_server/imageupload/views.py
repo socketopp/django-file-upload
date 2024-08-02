@@ -1,8 +1,9 @@
 
+from datetime import datetime
 from .decorators import validate_image_in_request, validate_image_file_type, validate_images_in_request
 from .models import ImageUpload
 from .serializers import ImageUploadSerializer
-from .tasks import process_and_save_image
+from .tasks import process_and_save_image, process_image_batch
 from adrf.views import APIView as AsyncAPIView
 from asgiref.sync import sync_to_async
 from channels.db import database_sync_to_async
@@ -13,11 +14,11 @@ from rest_framework import status
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from django.db import transaction
 import io
 import logging
 import traceback
 import uuid
-
 
 class ListView(APIView):
     """
@@ -93,7 +94,7 @@ class UploadImageView(APIView):
             img_io.getbuffer().nbytes,
             None,
         )
-        job_id = f"__;;{file_name}"
+        job_id = str(uuid.uuid4())
 
         # Initialize image instance
         image_instance = ImageUpload(
@@ -120,7 +121,7 @@ class UploadImageView(APIView):
 
         return Response({"message": "Image uploaded successfully"}, status=status.HTTP_200_OK)
       
-        
+      
 class AsyncUploadImageView(AsyncAPIView):
     """
     API View to handle asynchronous image upload.
@@ -142,6 +143,7 @@ class AsyncUploadImageView(AsyncAPIView):
       """
       try:
           images = request.FILES.getlist("images")
+          job_id = str(uuid.uuid4())
           for index, uploaded_image in enumerate(images):
               file_size = uploaded_image.size
               file_type = uploaded_image.content_type
@@ -149,28 +151,19 @@ class AsyncUploadImageView(AsyncAPIView):
 
               # Convert uploaded_image to bytes
               image_bytes = await sync_to_async(uploaded_image.read)()
-
-              if ';;' in file_name:
-                  job_id, name = file_name.split(';;')
-              else:
-                  job_id = str(uuid.uuid4())
-                  name = file_name
-                  file_name = f"{job_id};;{name}"
-              
+                            
               image_instance = ImageUpload(
                   size=file_size,
                   type=file_type,
-                  name=name,
-                  job_id=job_id,
+                  name=file_name,
+                  job_id=f"{job_id}-{index}",
                   status='processing'
               )
               await database_sync_to_async(image_instance.save)()
               process_and_save_image.delay(image_bytes, file_name, file_size, file_type, image_instance.id)
 
       except Exception as e:
-          print('AsyncUploadImageView Exception', e)
           logging.error(f'Error AsyncUploadImageView: {e}\n{traceback.format_exc()}')
-
           return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
       return Response(

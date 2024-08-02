@@ -8,6 +8,8 @@ from asgiref.sync import async_to_sync
 import base64
 from django.utils import timezone
 import mimetypes
+from django.core.files.base import ContentFile
+from .models import ImageUpload
 
 
 @shared_task
@@ -24,7 +26,7 @@ def process_and_save_image(image_bytes, file_name, file_size, file_type, image_i
 
     Args:
         image_bytes (bytes): The raw image data.
-        file_name (str): The original filename, containing job_id and name separated by ';;'.
+        file_name (str): The original filename
         file_size (int): The size of the original file in bytes.
         file_type (str): The MIME type of the image.
         image_instance_id (UUID): The ID of the corresponding ImageUpload instance.
@@ -35,7 +37,6 @@ def process_and_save_image(image_bytes, file_name, file_size, file_type, image_i
     Note:
         This function is decorated with @shared_task, allowing it to be executed by Celery workers.
     """
-    job_id, name = file_name.split(';;')
 
     try:
         image_instance = ImageUpload.objects.get(id=image_instance_id)
@@ -45,11 +46,13 @@ def process_and_save_image(image_bytes, file_name, file_size, file_type, image_i
     channel_layer = get_channel_layer()
     async_to_sync(channel_layer.group_send)(
         'upload_group',
-        {
+        {   
+            'name': file_name,
+            'size': file_size,
             'type': 'send_upload_notification',
-            'job_id': str(job_id),
+            'job_id': str(image_instance.job_id),
             'status': 'processing',
-            'message': f'Image {name} processing.'
+            'message': f'Image {file_name} processing.'
         }
     )
     
@@ -59,6 +62,17 @@ def process_and_save_image(image_bytes, file_name, file_size, file_type, image_i
     except Exception as e:
         image_instance.status = 'error'
         image_instance.save()
+        async_to_sync(channel_layer.group_send)(
+        'upload_group',
+          {   
+            'name': file_name,
+            'size': file_size,
+            'type': 'send_upload_notification',
+            'job_id': str(image_instance.job_id),
+            'status': 'error',
+            'message': f'Image {file_name} error.'
+          }
+        )
         raise Exception("Failed to open file")
 
     width, height = img.size
@@ -95,12 +109,6 @@ def process_and_save_image(image_bytes, file_name, file_size, file_type, image_i
         image_format = 'JPEG'
 
 
-    # image_format = file_type.split("/")[1].upper()
-
-
-
-
-
     img_io = io.BytesIO()
     img.save(img_io, format=image_format)
     img_io.seek(0)
@@ -130,11 +138,13 @@ def process_and_save_image(image_bytes, file_name, file_size, file_type, image_i
     async_to_sync(channel_layer.group_send)(
         'upload_group',
         {
+            'name': file_name,
+            'size': file_size,
             'image': img_data_uri, 
             'type': 'send_upload_notification',
-            'job_id': str(job_id),
+            'job_id': str(image_instance.job_id),
             'status': 'completed',
-            'message': f'Image {name} uploaded successfully.',
+            'message': f'Image {file_name} uploaded successfully.',
             'upload_time': upload_time_seconds
         }
     )

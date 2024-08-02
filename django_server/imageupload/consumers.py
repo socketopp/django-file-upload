@@ -73,6 +73,8 @@ class UploadConsumer(AsyncWebsocketConsumer):
             event (dict): A dictionary containing notification details.
         """
         data = {
+            'name': event['name'],
+            'size': event['size'],
             'job_id': event['job_id'],
             'status': event['status'],
             'message': event['message'],

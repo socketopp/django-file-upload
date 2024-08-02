@@ -3,7 +3,6 @@
 	import { onMount, onDestroy } from 'svelte';
 	import { schemaImages, type SchemaImages } from '$lib/schema';
 	import { superForm } from 'sveltekit-superforms/client';
-	import { v4 as uuidv4 } from 'uuid';
 	import { zodClient } from 'sveltekit-superforms/adapters';
 	import Dropzone from 'svelte-file-dropzone';
 	import FailIcon from '$lib/icons/Fail.svelte';
@@ -45,12 +44,10 @@
 			if (type !== 'send_upload_notification') return;
 			if (!job_id) return;
 
-			if (fileStatus[job_id]) {
-				fileStatus[job_id].status = status;
-				if (image && status === 'completed') {
-					fileStatus[job_id].image = image;
-					fileStatus[job_id].upload_time = upload_time;
-				}
+			fileStatus[job_id] = data;
+			if (image && status === 'completed') {
+				fileStatus[job_id].image = image;
+				fileStatus[job_id].upload_time = upload_time;
 			}
 		};
 
@@ -84,14 +81,7 @@
 	$effect(() => {
 		if (Object.keys(fileStatus).length === 0 && data.images && data.images.length > 0) {
 			fileStatus = data.images.reduce((acc: typeof fileStatus, image: Image) => {
-				acc[image.job_id] = {
-					image: image.image,
-					status: image.status,
-					name: `${image.job_id};;${image.name}`,
-					size: image.size,
-					type: image.type,
-					upload_time: image.upload_time
-				};
+				acc[image.job_id] = image;
 				return acc;
 			}, {});
 		}
@@ -100,33 +90,11 @@
 		}
 	});
 
-	let modifiedFiles: File[] = $state([]);
-
 	function handleFilesSelect(e: CustomEvent<FileSelectEventDetail>) {
 		const { acceptedFiles, fileRejections } = e.detail;
-		const uuid = uuidv4(); // Generate a unique ID for each upload batch
-
-		modifiedFiles = acceptedFiles.map((file, index) => {
-			const jobId = `${uuid}-${index}`;
-			const modifiedFileName = `${jobId};;${file.name}`;
-			return new File([file], modifiedFileName, { type: file.type });
-		});
-
-		// Update the fileStatus with initial processing status
-		modifiedFiles.forEach((file, index) => {
-			const jobId = `${uuid}-${index}`;
-			fileStatus[jobId] = {
-				status: 'processing',
-				name: file.name,
-				type: file.type,
-				size: file.size,
-				image: undefined
-			};
-		});
-
-		files.accepted = [...files.accepted, ...modifiedFiles];
+		files.accepted = [...files.accepted, ...acceptedFiles];
 		files.rejected = [...files.rejected, ...fileRejections];
-		$form.images = [...modifiedFiles];
+		$form.images = [...acceptedFiles];
 		submit(); // Trigger form submission
 	}
 </script>
@@ -181,10 +149,16 @@
 	<h1 class="block text-2xl font-medium leading-6 text-gray-900">Uploaded photos</h1>
 	<div class="mx-auto h-full min-h-[200px] w-[90%] max-w-7xl rounded-lg bg-gray-100 px-4 py-8 sm:px-6 lg:px-8">
 		<div class="flex flex-col rounded-xl border bg-white shadow-sm dark:border-neutral-700 dark:bg-neutral-800">
+			<div class="h-12 rounded-t-xl border-t border-gray-200 bg-gray-50 px-4 py-2 md:px-5 dark:border-neutral-700 dark:bg-white/10">
+				<div class="flex flex-wrap items-center justify-between gap-x-3">
+					<div>
+						<span class="text-sm font-semibold text-gray-800 dark:text-white"> {Object.keys(fileStatus)?.length} uploads </span>
+					</div>
+				</div>
+			</div>
 			<div class="space-y-7 p-4 md:p-5">
 				{#if Object.keys(fileStatus)?.length > 0}
 					{#each Object.entries(fileStatus).reverse() as [jobId, { name, size, image, upload_time }], index}
-						{@const file_name = name.split(';;')[1]}
 						{@const image_src = image && typeof image === 'string' ? image : undefined}
 						<div>
 							<div class="flex items-center justify-between">
@@ -200,7 +174,7 @@
 													'hover:text-blue-500': image !== undefined
 												})}
 											>
-												{file_name}
+												{name}
 											</p>
 										</button>
 										<p class="text-xs text-gray-500 dark:text-neutral-500">({Math.floor(size / 1000)} KB)</p>
@@ -222,13 +196,6 @@
 						</div>
 					{/each}
 				{/if}
-			</div>
-			<div class="h-12 rounded-b-xl border-t border-gray-200 bg-gray-50 px-4 py-2 md:px-5 dark:border-neutral-700 dark:bg-white/10">
-				<div class="flex flex-wrap items-center justify-between gap-x-3">
-					<div>
-						<span class="text-sm font-semibold text-gray-800 dark:text-white"> {Object.keys(fileStatus)?.length} uploads </span>
-					</div>
-				</div>
 			</div>
 		</div>
 	</div>
