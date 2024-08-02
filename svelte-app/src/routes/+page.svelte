@@ -80,7 +80,7 @@
 								<p class="pl-1">or drag and drop</p>
 							</div>
 
-							<p class="text-xs leading-5 text-gray-600">PNG, JPG, PNG or WEBP up to 10MB</p>
+							<p class="text-xs leading-5 text-gray-600">PNG, JPG, PNG or WEBP </p>
 						</div>
 					{:else if $form.image && !$errors?.image?.length}
 						<div class="relative mt-2 flex h-fit min-h-[134px] w-full items-center justify-center rounded-lg border-gray-900/25 px-2 py-4">

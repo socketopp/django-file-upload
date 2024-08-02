@@ -5,14 +5,12 @@ const ACCEPTED_IMAGE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/web
 export const schema = z.object({
 	image: z
 		.instanceof(File, { message: 'Please upload a file.' })
-		.refine((f) => f.size < 400_000, 'Max 400 kB upload size.')
 		.refine((f) => ACCEPTED_IMAGE_TYPES.includes(f?.type), 'Only .jpg, .jpeg, .png and .webp formats are supported.')
 });
 
 export const schemaImages = z.object({
 	images: z
 		.instanceof(File, { message: 'Please upload a file.' })
-		.refine((f) => f.size < 400_000, 'Max 400 kB upload size.')
 		.refine((f) => ACCEPTED_IMAGE_TYPES.includes(f?.type), 'Only .jpg, .jpeg, .png and .webp formats are supported.')
 		.array()
 });
