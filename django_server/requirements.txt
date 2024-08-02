@@ -1,0 +1,16 @@
+django-cors-headers
+Django<5.0,>=4.0
+celery>=5.2.7
+psycopg2-binary
+djangorestframework
+channels_redis
+adrf
+redis
+Pillow
+channels
+twisted[tls, http2]
+daphne
+websockets
+wsproto
+
+
