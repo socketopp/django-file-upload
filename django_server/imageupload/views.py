@@ -171,3 +171,66 @@ class AsyncUploadImageView(AsyncAPIView):
       )
       
       
+class BatchAsyncUploadImageView(AsyncAPIView):
+    @validate_images_in_request
+    async def post(self, request: Request) -> Response:
+        """
+        API View to handle batch asynchronous image upload.
+
+        This view processes multiple images in a single batch, improving efficiency for large uploads.
+        It creates ImageUpload instances for each image, saves them to the database in bulk,
+        and then triggers a single background task to process all images in the batch.
+
+        Attributes:
+            None
+
+        Methods:
+            post: Handles the POST request for batch image upload.
+        """
+        try:
+            images = request.FILES.getlist("images")
+            image_data_list = []
+            image_instances = []
+
+            @sync_to_async
+            def create_image_instances():
+                with transaction.atomic():
+                    job_id = str(uuid.uuid4())
+                    for index, uploaded_image in enumerate(images):
+                        file_size = uploaded_image.size
+                        file_type = uploaded_image.content_type
+                        file_name = uploaded_image.name
+
+                        image_bytes = uploaded_image.read()
+                        
+                        image_instance = ImageUpload(
+                            size=file_size,
+                            type=file_type,
+                            name=file_name,
+                            job_id=f"{job_id}-{index}",
+                            status='processing'
+                        )
+                        image_instances.append(image_instance)
+                        image_data_list.append((image_bytes, file_name, file_size, file_type))
+
+                    # Bulk create all image instances
+                    created_instances = ImageUpload.objects.bulk_create(image_instances)
+                    
+                    # Update image_data_list with created instance IDs
+                    for i, instance in enumerate(created_instances):
+                        image_data_list[i] += (instance.id,)
+
+            # Call the async wrapper function
+            await create_image_instances()
+
+            # Trigger the batch processing task
+            process_image_batch.delay(image_data_list)
+
+            return Response(
+                {"message": f"Batch upload of {len(images)} images initiated"},
+                status=status.HTTP_202_ACCEPTED
+            )
+
+        except Exception as e:
+            logging.error(f'Error BatchAsyncUploadImageView: {e}\n{traceback.format_exc()}')
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)

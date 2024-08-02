@@ -19,12 +19,13 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.urls import path
 from django.contrib import admin
-from imageupload.views import AsyncUploadImageView, UploadImageView, ListView
+from imageupload.views import BatchAsyncUploadImageView, AsyncUploadImageView, UploadImageView, ListView
 
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("api/upload", UploadImageView.as_view(), name="upload-image"),
     path("api/async/upload", AsyncUploadImageView.as_view(), name="async-upload-image"),
+    path("api/async/batch/upload", BatchAsyncUploadImageView.as_view(), name="async-batch-upload-image"),
     path("api/list", ListView.as_view(), name="list-images"),
 ]
 
