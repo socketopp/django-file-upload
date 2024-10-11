@@ -1,4 +1,4 @@
-# dbtune-code-assignment
+# django-file-upload
 
 This project consists of a Django server for image processing and a Svelte frontend application. It allows users to upload images, process them asynchronously, and view the uploaded images.
 
@@ -17,8 +17,8 @@ This project consists of a Django server for image processing and a Svelte front
 
 1. Clone the repository:
    ```
-   git clone https://github.com/socketopp/dbtune-code-assignment.git
-   cd dbtune-code-assignment
+   git clone https://github.com/socketopp/django-file-upload.git
+   cd django-file-upload
    ```
 
 2. Build and start the Docker containers:
